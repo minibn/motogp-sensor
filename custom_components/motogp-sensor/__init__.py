@@ -48,14 +48,21 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # On enregistre la ressource carte en tout premier : même si l'appel à
+    # l'API MotoGP échoue juste après (première synchro), la carte doit
+    # rester disponible pour le dashboard. On isole les erreurs pour ne pas
+    # bloquer la création du capteur si le service statique a un souci.
+    try:
+        await _async_register_card(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Impossible d'enregistrer la carte MotoGP")
+
     category_name = entry.data.get(CONF_CATEGORY, DEFAULT_CATEGORY_NAME)
 
     coordinator = MotoGPDataUpdateCoordinator(hass, category_name)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
-
-    await _async_register_card(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
