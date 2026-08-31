@@ -1,0 +1,12 @@
+{
+  "domain": "motogp",
+  "name": "MotoGP",
+  "codeowners": ["@minibn"],
+  "config_flow": true,
+  "documentation": "https://github.com/minibn/motogp-sensor",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/minibn/motogp-sensor/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

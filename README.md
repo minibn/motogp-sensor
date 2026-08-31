@@ -1,60 +1,90 @@
-# Notice
+# HA MotoGP (intégration HACS non officielle)
 
-The component and platforms in this repository are not meant to be used by a
-user, but as a "blueprint" that custom component developers can build
-upon, to make more awesome stuff.
+Squelette d'intégration Home Assistant pour afficher la prochaine course du
+championnat MotoGP, sur le même principe que
+[F1 Sensor](https://github.com/Nicxe/f1_sensor) pour la F1.
 
-HAVE FUN! 😎
+⚠️ Utilise l'API non documentée `pulselive` de MotoGP/Dorna. Ni stable ni
+garantie dans le temps : vérifiez la forme réelle des réponses JSON avant de
+faire confiance aux noms de champs utilisés dans le code (voir commentaires
+dans `api.py` et `sensor.py`).
 
-## Why?
+## Installation
 
-This is simple, by having custom_components look (README + structure) the same
-it is easier for developers to help each other and for users to start using them.
+1. Publiez ce dossier tel quel dans un dépôt GitHub public
+   (`custom_components/motogp/` + `hacs.json` à la racine).
+2. Dans HACS : Intégrations → menu ⋮ → Dépôts personnalisés → ajoutez l'URL
+   de votre dépôt, type "Intégration".
+3. Installez "MotoGP", redémarrez Home Assistant.
+4. Paramètres → Appareils et services → Ajouter une intégration → "MotoGP",
+   choisissez la catégorie (MotoGP / Moto2 / Moto3).
 
-If you are a developer and you want to add things to this "blueprint" that you think more
-developers will have use for, please open a PR to add it :)
+Cela crée `sensor.motogp_prochaine_course` avec :
+- état = nom du Grand Prix
+- attributs : `circuit`, `pays`, `date_debut`, `jours_restants`, `sessions`
 
-## What?
+## Avant de coder : valider l'API vous-même
 
-This repository contains multiple files, here is a overview:
+Avant même d'ouvrir `api.py`, testez ces appels dans un navigateur (ou
+`curl`) pour confirmer la structure réelle des champs :
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/renovate.json` | Dependency update configuration for Renovate (enabled by default). | [Documentation](https://docs.renovatebot.com/configuration-options/)
-`.github/_dependabot.yml` | Dependency update configuration for Dependabot (disabled, see "Dependency updates" below). | [Documentation](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`custom_components/integration_blueprint/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`requirements_dev.txt` | Python packages used for development/testing this integration (also installs lint tooling via `requirements_lint.txt`). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
-`requirements_lint.txt` | Python packages used to lint this integration (installed by the Lint CI job). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
-`requirements_common.txt` | Python packages common to CI and local dev, installed first so any pip upgrade completes before other dependencies (e.g. a modern pip). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
+```
+GET https://api.pulselive.motogp.com/motogp/v1/results/seasons
+GET https://api.pulselive.motogp.com/motogp/v1/results/events?seasonUuid=<id>&isFinished=false
+GET https://api.pulselive.motogp.com/motogp/v1/results/categories?seasonUuid=<id>
+GET https://api.pulselive.motogp.com/motogp/v1/results/sessions?eventUuid=<id>&categoryUuid=<id>
+```
 
-## Dependency updates
+Ajustez ensuite les clés (`date_start`, `circuit.name`, etc.) dans `api.py`
+et `sensor.py` selon ce que vous observez réellement — c'est l'étape la plus
+importante, plus que le code lui-même.
 
-This template ships with configuration for **two** dependency update tools. Pick
-**one** and remove or disable the other:
+## Carte Lovelace custom "MotoGP - Prochaine course"
 
-- **Renovate** (`.github/renovate.json`) is enabled by default.
-- **Dependabot** (`.github/_dependabot.yml`) is included but disabled — the `_`
-  prefix means GitHub ignores it. To use Dependabot instead, rename the file
-  back to `.github/dependabot.yml` and delete `.github/renovate.json`.
+Le fichier `custom_components/motogp/www/motogp-next-race-card.js` est une
+carte Lovelace custom (Web Component, sans étape de build) qui affiche :
+- catégorie + nom du Grand Prix
+- circuit et pays
+- un countdown live (jours / heures / min / sec) jusqu'au début de l'event
+- une frise des sessions (EL1, EL2, EL3, Q1, Q2, Course...), la course étant
+  mise en valeur par un motif à damier
 
-## How?
+L'intégration l'enregistre **automatiquement** comme ressource frontend au
+démarrage (voir `_async_register_card` dans `__init__.py`), exactement
+comme le fait F1 Sensor pour ses cartes bundlées : pas besoin de l'ajouter
+manuellement dans Paramètres → Tableaux de bord → Ressources.
 
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `integration_blueprint` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `Integration Blueprint` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
+Si jamais elle n'apparaît pas après une mise à jour, videz le cache du
+navigateur (la ressource est versionnée via `?v=CARD_VERSION` pour éviter
+ce problème dans la plupart des cas).
 
-## Next steps
+Utilisation dans un tableau de bord (mode YAML de la carte) :
 
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon).
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+```yaml
+type: custom:motogp-next-race-card
+entity: sensor.motogp_prochaine_course
+title: MotoGP
+```
+
+Ou via l'éditeur visuel : "Ajouter une carte" → cherchez
+"MotoGP - Prochaine course" dans la liste des cartes custom.
+
+## Alternative rapide sans carte custom
+
+Une carte Markdown fonctionne aussi si vous préférez ne pas dépendre de JS
+custom :
+
+```yaml
+type: markdown
+content: >
+  ## 🏍️ {{ state_attr('sensor.motogp_prochaine_course', 'circuit') }}
+
+  **{{ states('sensor.motogp_prochaine_course') }}**
+
+  📅 {{ as_timestamp(state_attr('sensor.motogp_prochaine_course', 'date_debut')) | timestamp_custom('%d %B %Y') }}
+  — dans {{ state_attr('sensor.motogp_prochaine_course', 'jours_restants') }} jours
+
+  {% for s in state_attr('sensor.motogp_prochaine_course', 'sessions') %}
+  - {{ s.type }} : {{ s.date_start }}
+  {% endfor %}
+```
