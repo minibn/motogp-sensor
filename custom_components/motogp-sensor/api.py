@@ -92,7 +92,13 @@ class MotoGPApiClient:
             raw = event.get("date_start") or event.get("date")
             if not raw:
                 return datetime.max.replace(tzinfo=timezone.utc)
-            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                # Certaines réponses de l'API omettent le fuseau : on
+                # suppose UTC plutôt que de comparer un datetime naïf
+                # à un datetime "aware" (ce qui lève TypeError).
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
 
         upcoming = [e for e in events if event_start(e) >= now]
         candidates = upcoming or events
