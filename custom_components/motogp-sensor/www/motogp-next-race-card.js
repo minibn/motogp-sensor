@@ -5,7 +5,9 @@
  * Grand Prix MotoGP, à partir des attributs exposés par
  * sensor.motogp_prochaine_course (intégration "motogp").
  *
- * Pas de dépendance de build : simple Web Component (Shadow DOM).
+ * Style inspiré de la carte "Next Race" de F1 Sensor : sobre, fond
+ * quasi-noir avec des blocs imbriqués légèrement plus clairs, plutôt
+ * qu'un habillage très coloré.
  */
 
 const FONT_IMPORT_ID = "motogp-card-font-import";
@@ -16,35 +18,23 @@ function ensureFontLoaded() {
   link.id = FONT_IMPORT_ID;
   link.rel = "stylesheet";
   link.href =
-    "https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap";
+    "https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap";
   document.head.appendChild(link);
 }
 
-const SESSION_LABELS = {
-  FP1: "EL1",
-  FP2: "EL2",
-  FP3: "EL3",
-  P1: "EL1",
-  P2: "EL2",
-  P3: "EL3",
-  PR: "Warm-up",
-  Q1: "Q1",
-  Q2: "Q2",
-  QP: "Qualifs",
-  SPR: "Sprint",
-  RAC: "Course",
-  RACE: "Course",
-};
-
-function shortSessionLabel(type) {
-  if (!type) return "?";
-  const key = String(type).toUpperCase().replace(/\s+/g, "");
-  return SESSION_LABELS[key] || type;
+function countryFlagEmoji(iso) {
+  if (!iso || iso.length !== 2) return "";
+  const codePoints = [...iso.toUpperCase()].map(
+    (c) => 127397 + c.charCodeAt(0)
+  );
+  return String.fromCodePoint(...codePoints);
 }
 
-function isRaceSession(type) {
-  const key = String(type || "").toUpperCase();
-  return key.includes("RAC");
+function formatDateTime(iso, opts) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, opts);
 }
 
 class MotoGPNextRaceCard extends HTMLElement {
@@ -66,11 +56,9 @@ class MotoGPNextRaceCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    const entityId = this._config.entity;
-    const stateObj = hass.states[entityId];
-
+    const stateObj = hass.states[this._config.entity];
     if (!stateObj) {
-      this._renderMissing(entityId);
+      this._renderMissing(this._config.entity);
       return;
     }
     this._renderState(stateObj);
@@ -100,136 +88,142 @@ class MotoGPNextRaceCard extends HTMLElement {
   _css() {
     return `
       :host {
-        --mgp-bg: #101114;
-        --mgp-surface: #1b1d22;
-        --mgp-surface-2: #24272e;
-        --mgp-accent: #ff4d1c;
-        --mgp-accent-2: #ffd166;
-        --mgp-text: #f2f1ed;
-        --mgp-muted: #9aa0a8;
+        --mgp-bg: #17181c;
+        --mgp-surface: #202227;
+        --mgp-surface-2: #26282e;
+        --mgp-text: #f4f3f0;
+        --mgp-muted: #9a9da5;
+        --mgp-accent: #ff4f2e;
+        --mgp-border: rgba(255,255,255,0.07);
       }
       ha-card {
         background: var(--mgp-bg);
         color: var(--mgp-text);
-        border-radius: 14px;
+        border-radius: 16px;
         overflow: hidden;
         padding: 0;
       }
       .card {
-        display: flex;
-        flex-direction: column;
         font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        padding: 16px 18px 18px;
       }
-      .topbar {
+      .header {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 16px;
-        background: linear-gradient(90deg, var(--mgp-surface-2), var(--mgp-surface));
-        border-bottom: 2px solid var(--mgp-accent);
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 4px;
       }
-      .category {
-        font-size: 12px;
-        letter-spacing: 0.08em;
-        font-weight: 600;
-        color: var(--mgp-accent);
+      .flag {
+        font-size: 22px;
+        line-height: 1.2;
       }
-      .round {
-        font-size: 12px;
-        color: var(--mgp-muted);
-      }
-      .main {
-        padding: 16px 18px 6px;
-      }
-      .country {
-        font-size: 13px;
-        color: var(--mgp-muted);
-        margin-bottom: 2px;
-      }
-      .circuit {
-        font-family: "Oswald", "Inter", system-ui, sans-serif;
-        font-weight: 600;
-        font-size: 26px;
-        line-height: 1.15;
-        letter-spacing: 0.01em;
-        margin: 0 0 14px 0;
-      }
-      .countdown {
-        display: flex;
-        gap: 14px;
-        margin-bottom: 6px;
-      }
-      .countdown .unit {
+      .title-group {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        min-width: 46px;
       }
-      .countdown .value {
+      .event-name {
         font-family: "Oswald", "Inter", system-ui, sans-serif;
-        font-variant-numeric: tabular-nums;
-        font-size: 30px;
-        font-weight: 700;
-        color: var(--mgp-accent-2);
-        line-height: 1;
-      }
-      .countdown .label {
-        font-size: 10px;
-        color: var(--mgp-muted);
-        letter-spacing: 0.06em;
-        margin-top: 4px;
-      }
-      .live-banner {
-        font-family: "Oswald", "Inter", system-ui, sans-serif;
-        font-size: 20px;
         font-weight: 600;
-        color: var(--mgp-accent);
-        padding: 6px 0 10px;
+        font-size: 19px;
+        line-height: 1.2;
       }
-      .sessions {
-        display: flex;
-        overflow-x: auto;
-        gap: 8px;
-        padding: 12px 18px 16px;
-        background: var(--mgp-surface);
-        border-top: 1px solid rgba(255,255,255,0.06);
-      }
-      .session {
-        flex: 0 0 auto;
-        background: var(--mgp-surface-2);
-        border-radius: 8px;
-        padding: 8px 10px;
-        min-width: 78px;
-        text-align: center;
-      }
-      .session .type {
+      .subtitle {
         font-size: 11px;
-        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
         color: var(--mgp-muted);
-        letter-spacing: 0.04em;
+        margin-top: 2px;
       }
-      .session .time {
-        font-size: 13px;
-        margin-top: 3px;
+      .box {
+        background: var(--mgp-surface);
+        border: 1px solid var(--mgp-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 12px;
+      }
+      .label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--mgp-muted);
+      }
+      .countdown-value {
+        font-family: "Oswald", "Inter", system-ui, sans-serif;
         font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        font-size: 24px;
+        margin-top: 2px;
       }
-      .session.race {
-        background: repeating-linear-gradient(
-          45deg,
-          var(--mgp-surface-2),
-          var(--mgp-surface-2) 6px,
-          #2c2f36 6px,
-          #2c2f36 12px
-        );
-        border: 1px solid var(--mgp-accent);
+      .countdown-sub {
+        font-size: 12px;
+        color: var(--mgp-muted);
+        margin-top: 2px;
       }
-      .session.race .type {
-        color: var(--mgp-accent-2);
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .info-cell .value {
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: 3px;
+      }
+      .info-cell .sub {
+        font-size: 11px;
+        color: var(--mgp-muted);
+        margin-top: 1px;
+      }
+      .footer {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--mgp-border);
+      }
+      .footer-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .footer-title {
+        font-family: "Oswald", "Inter", system-ui, sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .footer-count {
+        font-size: 11px;
+        color: var(--mgp-muted);
+      }
+      .session-list {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .session-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 4px;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      .session-row:nth-child(odd) {
+        background: rgba(255,255,255,0.02);
+      }
+      .session-row .type {
+        color: var(--mgp-text);
+      }
+      .session-row.race .type {
+        color: var(--mgp-accent);
+        font-weight: 600;
+      }
+      .session-row .time {
+        color: var(--mgp-muted);
       }
       .empty, .missing {
-        padding: 20px 18px;
+        padding: 12px 4px;
         color: var(--mgp-muted);
-        font-size: 14px;
+        font-size: 13px;
       }
     `;
   }
@@ -241,57 +235,82 @@ class MotoGPNextRaceCard extends HTMLElement {
   }
 
   _renderState(stateObj) {
+    const attrs = stateObj.attributes;
+
     this._eventName = stateObj.state;
-    this._circuit = stateObj.attributes.circuit || "Circuit inconnu";
-    this._country = stateObj.attributes.pays || "";
-    this._dateStart = stateObj.attributes.date_debut || null;
-    this._sessions = stateObj.attributes.sessions || [];
-    this._category = (this._config.title || "MotoGP").toUpperCase();
+    this._circuit = attrs.circuit || "Circuit inconnu";
+    this._country = attrs.pays || "";
+    this._countryIso = attrs.pays_iso || "";
+    this._weekendStart = attrs.debut_weekend || null;
+    this._raceStart = attrs.debut_course || null;
+    this._nextSession = attrs.prochaine_session || null;
+    this._round = attrs.manche;
+    this._roundTotal = attrs.manche_total;
+    this._season = attrs.saison;
+    this._sessions = attrs.sessions || [];
+    this._countdownTarget = this._nextSession ? this._nextSession.date : this._weekendStart;
+    this._countdownLabel = this._nextSession ? this._nextSession.label : "le début du week-end";
 
     const root = this.shadowRoot.querySelector(".card");
     if (!root) return;
 
     root.innerHTML = `
-      <div class="topbar">
-        <span class="category">${this._category}</span>
-        <span class="round">${this._eventName || ""}</span>
+      <div class="header">
+        <div class="flag">${countryFlagEmoji(this._countryIso)}</div>
+        <div class="title-group">
+          <div class="event-name">${this._eventName || ""}</div>
+          <div class="subtitle">${this._circuit}${this._country ? " · " + this._country : ""}</div>
+        </div>
       </div>
-      <div class="main">
-        <div class="country">${this._country}</div>
-        <div class="circuit">${this._circuit}</div>
+
+      <div class="box">
+        <div class="label">Compte à rebours</div>
         <div class="countdown-slot"></div>
       </div>
-      <div class="sessions">
-        ${this._renderSessions()}
+
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="label">Prochaine session</div>
+          <div class="value">${this._nextSession ? this._nextSession.label : "—"}</div>
+          <div class="sub">${formatDateTime(this._nextSession && this._nextSession.date, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</div>
+        </div>
+        <div class="info-cell">
+          <div class="label">Début course</div>
+          <div class="value">${formatDateTime(this._raceStart, { day: "2-digit", month: "short" })}</div>
+          <div class="sub">${formatDateTime(this._raceStart, { hour: "2-digit", minute: "2-digit" })}</div>
+        </div>
+        <div class="info-cell">
+          <div class="label">Manche</div>
+          <div class="value">${this._round ? "Manche " + this._round : "—"}</div>
+          <div class="sub">${this._season ? "Saison " + this._season : ""}</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footer-top">
+          <div class="footer-title">Programme</div>
+          <div class="footer-count">${this._sessions.length} session${this._sessions.length > 1 ? "s" : ""}</div>
+        </div>
+        <div class="session-list">
+          ${this._renderSessionRows()}
+        </div>
       </div>
     `;
 
     this._updateCountdown();
   }
 
-  _renderSessions() {
+  _renderSessionRows() {
     if (!this._sessions.length) {
       return `<div class="empty">Sessions non encore publiées</div>`;
     }
     return this._sessions
       .map((s) => {
-        const label = shortSessionLabel(s.type);
-        const raceClass = isRaceSession(s.type) ? "race" : "";
-        let timeText = "—";
-        if (s.date_start) {
-          const d = new Date(s.date_start);
-          if (!Number.isNaN(d.getTime())) {
-            timeText = d.toLocaleString(undefined, {
-              weekday: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          }
-        }
+        const raceClass = s.type && String(s.type).toUpperCase() === "RAC" ? "race" : "";
         return `
-          <div class="session ${raceClass}">
-            <div class="type">${label}</div>
-            <div class="time">${timeText}</div>
+          <div class="session-row ${raceClass}">
+            <span class="type">${s.label}</span>
+            <span class="time">${formatDateTime(s.date, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
         `;
       })
@@ -302,22 +321,25 @@ class MotoGPNextRaceCard extends HTMLElement {
     const slot = this.shadowRoot && this.shadowRoot.querySelector(".countdown-slot");
     if (!slot) return;
 
-    if (!this._dateStart) {
-      slot.innerHTML = "";
+    if (!this._countdownTarget) {
+      slot.innerHTML = `<div class="countdown-value">—</div>`;
       return;
     }
 
-    const target = new Date(this._dateStart).getTime();
+    const target = new Date(this._countdownTarget).getTime();
     const now = Date.now();
     const diff = target - now;
 
     if (Number.isNaN(target)) {
-      slot.innerHTML = "";
+      slot.innerHTML = `<div class="countdown-value">—</div>`;
       return;
     }
 
     if (diff <= 0) {
-      slot.innerHTML = `<div class="live-banner">🏁 Week-end en cours</div>`;
+      slot.innerHTML = `
+        <div class="countdown-value">🏁 En cours</div>
+        <div class="countdown-sub">Session en cours ou terminée</div>
+      `;
       return;
     }
 
@@ -325,15 +347,10 @@ class MotoGPNextRaceCard extends HTMLElement {
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
 
     slot.innerHTML = `
-      <div class="countdown">
-        <div class="unit"><div class="value">${days}</div><div class="label">JOURS</div></div>
-        <div class="unit"><div class="value">${String(hours).padStart(2, "0")}</div><div class="label">H</div></div>
-        <div class="unit"><div class="value">${String(minutes).padStart(2, "0")}</div><div class="label">MIN</div></div>
-        <div class="unit"><div class="value">${String(seconds).padStart(2, "0")}</div><div class="label">SEC</div></div>
-      </div>
+      <div class="countdown-value">J-${days} ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m</div>
+      <div class="countdown-sub">Avant ${this._countdownLabel}</div>
     `;
   }
 }

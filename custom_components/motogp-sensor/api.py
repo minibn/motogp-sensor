@@ -19,6 +19,43 @@ _LOGGER = logging.getLogger(__name__)
 
 _TIMEOUT = ClientTimeout(total=15)
 
+# Codes de session observés sur l'API Results (FP1/FP2/FP3, Q1/Q2, Warm-up,
+# Course...). Le champ "type" est un code court, combiné à "number" pour
+# distinguer par exemple FP1 de FP2.
+_SESSION_TYPE_LABELS = {
+    "FP": "EL",   # Essais Libres
+    "Q": "Q",
+    "WUP": "Warm-up",
+    "RAC": "Course",
+    "EP": "EL",
+    "QP": "Q",
+    "SPR": "Sprint",
+    "TTS": "Essai TT",
+}
+
+
+def session_label(session: dict[str, Any]) -> str:
+    """Construit un libellé court ('EL1', 'Q2', 'Course'...) pour une session."""
+    raw_type = str(session.get("type") or "").upper()
+    number = session.get("number")
+    base = _SESSION_TYPE_LABELS.get(raw_type, raw_type or "?")
+    if number and base not in ("Warm-up", "Course", "Sprint", "Essai TT"):
+        return f"{base}{number}"
+    return base
+
+
+def _parse_session_date(session: dict[str, Any]) -> datetime | None:
+    raw = session.get("date")
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
 
 class MotoGPApiError(Exception):
     """Erreur générique de l'API MotoGP."""
@@ -50,7 +87,6 @@ class MotoGPApiClient:
         for season in seasons:
             if season.get("current"):
                 return season
-        # Filet de sécurité : on prend l'année la plus élevée.
         return max(seasons, key=lambda s: s.get("year", 0))
 
     async def async_get_categories(self, season_uuid: str) -> list[dict[str, Any]]:
@@ -72,52 +108,80 @@ class MotoGPApiClient:
             {"eventUuid": event_uuid, "categoryUuid": category_uuid},
         )
 
-    async def async_get_next_event(
-        self, category_name: str
-    ) -> dict[str, Any] | None:
-        """Renvoie le prochain événement (non terminé) le plus proche."""
+    async def async_get_next_event(self, category_name: str) -> dict[str, Any] | None:
+        """Construit toutes les infos du prochain Grand Prix pour une catégorie.
+
+        On ne se fie à aucun champ de date au niveau de l'événement lui-même
+        (sa forme exacte n'est pas documentée de façon fiable) : les dates
+        affichées (week-end, prochaine session, départ course) sont toutes
+        dérivées des sessions, dont le schéma est confirmé par la doc de
+        l'API Results.
+        """
         season = await self.async_get_current_season()
         season_uuid = season["id"]
 
-        events = await self.async_get_events(season_uuid, is_finished=False)
-        if not events:
+        finished_events = await self.async_get_events(season_uuid, is_finished=True)
+        upcoming_events = await self.async_get_events(season_uuid, is_finished=False)
+        if not upcoming_events:
             return None
 
-        now = datetime.now(timezone.utc)
+        # On ignore les séances de tests pour la numérotation "manche X/Y"
+        # et pour le choix du prochain évènement, quand l'info est présente.
+        finished_real = [e for e in finished_events if not e.get("test")]
+        upcoming_real = [e for e in upcoming_events if not e.get("test")] or upcoming_events
 
-        def event_start(event: dict[str, Any]) -> datetime:
-            # Le champ exact dépend de la réponse réelle de l'API :
-            # certains dumps utilisent "date_start", d'autres un objet
-            # imbriqué "circuit"/"date". Adaptez ici après vérification.
-            raw = event.get("date_start") or event.get("date")
-            if not raw:
-                return datetime.max.replace(tzinfo=timezone.utc)
-            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            if parsed.tzinfo is None:
-                # Certaines réponses de l'API omettent le fuseau : on
-                # suppose UTC plutôt que de comparer un datetime naïf
-                # à un datetime "aware" (ce qui lève TypeError).
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return parsed
+        next_event = upcoming_real[0]
+        round_number = len(finished_real) + 1
+        total_rounds = len(finished_real) + len(upcoming_real)
 
-        upcoming = [e for e in events if event_start(e) >= now]
-        candidates = upcoming or events
-        next_event = min(candidates, key=event_start)
-
-        # On récupère aussi les sessions (essais, qualifs, course) pour la
-        # catégorie demandée (MotoGP / Moto2 / Moto3), si on la retrouve.
         categories = await self.async_get_categories(season_uuid)
         category = next(
             (c for c in categories if c.get("name") == category_name), None
         )
+
         sessions: list[dict[str, Any]] = []
         if category:
             try:
-                sessions = await self.async_get_sessions(
-                    next_event["id"], category["id"]
-                )
+                sessions = await self.async_get_sessions(next_event["id"], category["id"])
             except MotoGPApiError as err:
                 _LOGGER.debug("Impossible de récupérer les sessions: %s", err)
 
-        next_event["_sessions"] = sessions
-        return next_event
+        # Sessions triées chronologiquement, avec leur date déjà parsée.
+        dated_sessions = sorted(
+            (
+                (s, d)
+                for s in sessions
+                if (d := _parse_session_date(s)) is not None
+            ),
+            key=lambda item: item[1],
+        )
+
+        now = datetime.now(timezone.utc)
+        next_session = next((s for s, d in dated_sessions if d >= now), None)
+        race_entry = next(
+            (s for s, _ in dated_sessions if str(s.get("type", "")).upper() == "RAC"),
+            None,
+        )
+
+        weekend_start = dated_sessions[0][1] if dated_sessions else None
+        race_start = None
+        if race_entry is not None:
+            race_start = _parse_session_date(race_entry)
+
+        return {
+            "event": next_event,
+            "season_year": season.get("year"),
+            "round": round_number,
+            "total_rounds": total_rounds,
+            "sessions": [
+                {"label": session_label(s), "type": s.get("type"), "date": d.isoformat()}
+                for s, d in dated_sessions
+            ],
+            "weekend_start": weekend_start.isoformat() if weekend_start else None,
+            "race_start": race_start.isoformat() if race_start else None,
+            "next_session": (
+                {"label": session_label(next_session), "date": _parse_session_date(next_session).isoformat()}
+                if next_session is not None
+                else None
+            ),
+        }

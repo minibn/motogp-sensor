@@ -29,11 +29,11 @@ class MotoGPDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            next_event = await self.client.async_get_next_event(self._category_name)
+            data = await self.client.async_get_next_event(self._category_name)
         except MotoGPApiError as err:
             raise UpdateFailed(str(err)) from err
 
-        if next_event is None:
+        if data is None:
             raise UpdateFailed("Aucun événement à venir trouvé")
 
-        return {"next_event": next_event}
+        return data
