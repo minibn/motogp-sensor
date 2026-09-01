@@ -42,42 +42,54 @@ class MotoGPNextRaceSensor(CoordinatorEntity[MotoGPDataUpdateCoordinator], Senso
         )
 
     @property
+    def _data(self) -> dict[str, Any]:
+        return self.coordinator.data or {}
+
+    @property
     def _event(self) -> dict[str, Any]:
-        return self.coordinator.data.get("next_event", {})
+        return self._data.get("event", {})
 
     @property
     def native_value(self) -> str | None:
-        # Adaptez le champ selon le JSON réel (ex: "name" ou "short_name").
-        return self._event.get("name") or self._event.get("short_name")
+        return self._event.get("name") or self._event.get("sponsored_name")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         event = self._event
-        circuit = event.get("circuit", {}) if isinstance(event.get("circuit"), dict) else {}
+        data = self._data
 
-        date_start_raw = event.get("date_start") or event.get("date")
-        date_start = None
-        days_remaining = None
-        if date_start_raw:
+        circuit = event.get("circuit")
+        circuit_name = circuit.get("name") if isinstance(circuit, dict) else circuit
+
+        country = event.get("country")
+        if isinstance(country, dict):
+            country_name = country.get("name")
+            country_iso = country.get("iso")
+        else:
+            # Filet de sécurité si l'API renvoie un jour directement une
+            # chaîne (observé sur d'autres endpoints de cette même API).
+            country_name = country
+            country_iso = None
+
+        weekend_start = data.get("weekend_start")
+        jours_restants = None
+        if weekend_start:
             try:
-                date_start = datetime.fromisoformat(date_start_raw.replace("Z", "+00:00"))
-                days_remaining = (date_start.date() - datetime.now(timezone.utc).date()).days
+                start_dt = datetime.fromisoformat(weekend_start)
+                jours_restants = (start_dt.date() - datetime.now(timezone.utc).date()).days
             except ValueError:
                 pass
 
-        sessions = []
-        for session in event.get("_sessions", []):
-            sessions.append(
-                {
-                    "type": session.get("type") or session.get("name"),
-                    "date_start": session.get("date_start"),
-                }
-            )
-
         return {
-            "circuit": circuit.get("name"),
-            "pays": event.get("country"),
-            "date_debut": date_start.isoformat() if date_start else None,
-            "jours_restants": days_remaining,
-            "sessions": sessions,
+            "circuit": circuit_name,
+            "pays": country_name,
+            "pays_iso": country_iso,
+            "manche": data.get("round"),
+            "manche_total": data.get("total_rounds"),
+            "saison": data.get("season_year"),
+            "debut_weekend": weekend_start,
+            "debut_course": data.get("race_start"),
+            "prochaine_session": data.get("next_session"),
+            "jours_restants": jours_restants,
+            "sessions": data.get("sessions", []),
         }
