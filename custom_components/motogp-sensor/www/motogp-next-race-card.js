@@ -229,19 +229,34 @@ class MotoGPNextRaceCard extends HTMLElement {
         color: var(--mgp-muted);
       }
       .circuit-map-box {
-        background: #f3f2ee;
+        background: var(--mgp-bg);
+        border: 1px solid var(--mgp-border);
         border-radius: 10px;
         margin-top: 12px;
         padding: 8px;
         display: flex;
         flex-direction: column;
         align-items: center;
+        overflow: hidden;
       }
-      .circuit-map-box img {
+      .circuit-map-frame {
         width: 100%;
-        max-height: 180px;
+        height: 170px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .circuit-map-frame img {
+        width: 100%;
+        height: 100%;
         object-fit: contain;
-        display: block;
+        transform: scale(1.35);
+        /* Le SVG source est en traits sombres sur fond clair : on
+           l'inverse pour obtenir un tracé blanc sur fond noir, tout en
+           conservant la teinte des éléments rouges (points de repère)
+           grâce au hue-rotate qui compense l'inversion de teinte. */
+        filter: invert(1) hue-rotate(180deg);
       }
       .circuit-map-caption {
         display: flex;
@@ -251,7 +266,7 @@ class MotoGPNextRaceCard extends HTMLElement {
         font-size: 10px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: #6b6f76;
+        color: var(--mgp-muted);
       }
       .empty, .missing {
         padding: 12px 4px;
@@ -300,8 +315,6 @@ class MotoGPNextRaceCard extends HTMLElement {
         </div>
       </div>
 
-      ${this._renderCircuitMap()}
-
       <div class="box">
         <div class="label">Compte à rebours</div>
         <div class="countdown-slot"></div>
@@ -336,6 +349,8 @@ class MotoGPNextRaceCard extends HTMLElement {
         </div>
       </div>
       ` : ""}
+
+      ${this._renderCircuitMap()}
     `;
 
     this._updateCountdown();
@@ -353,7 +368,9 @@ class MotoGPNextRaceCard extends HTMLElement {
 
     return `
       <div class="circuit-map-box">
-        <img src="${src}" alt="Plan du circuit" loading="lazy" />
+        <div class="circuit-map-frame">
+          <img src="${src}" alt="Plan du circuit" loading="lazy" />
+        </div>
         ${cornerText ? `<div class="circuit-map-caption"><span>${cornerText}</span></div>` : ""}
       </div>
     `;

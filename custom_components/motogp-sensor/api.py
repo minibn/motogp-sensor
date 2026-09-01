@@ -32,6 +32,7 @@ _SESSION_TYPE_LABELS = {
     "QP": "Q",
     "SPR": "Sprint",
     "TTS": "Essai TT",
+    "PR": "Essais",
 }
 
 
@@ -40,7 +41,7 @@ def session_label(session: dict[str, Any]) -> str:
     raw_type = str(session.get("type") or "").upper()
     number = session.get("number")
     base = _SESSION_TYPE_LABELS.get(raw_type, raw_type or "?")
-    if number and base not in ("Warm-up", "Course", "Sprint", "Essai TT"):
+    if number and base not in ("Warm-up", "Course", "Sprint", "Essai TT", "Essais"):
         return f"{base}{number}"
     return base
 
