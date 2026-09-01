@@ -251,7 +251,7 @@ class MotoGPNextRaceCard extends HTMLElement {
         width: 100%;
         height: 100%;
         object-fit: contain;
-        transform: scale(1.35);
+        transform: scale(1.50);
         /* Le SVG source est en traits sombres sur fond clair : on
            l'inverse pour obtenir un tracé blanc sur fond noir, tout en
            conservant la teinte des éléments rouges (points de repère)
