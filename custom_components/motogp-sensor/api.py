@@ -13,6 +13,7 @@ from .const import (
     ENDPOINT_EVENTS,
     ENDPOINT_SEASONS,
     ENDPOINT_SESSIONS,
+    EVENT_DETAIL_BASE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,6 +109,52 @@ class MotoGPApiClient:
             {"eventUuid": event_uuid, "categoryUuid": category_uuid},
         )
 
+    async def async_get_event_detail(self, toad_api_uuid: str) -> dict[str, Any]:
+        """Appelle GET /events/{toad_api_uuid} (endpoint distinct de /results/).
+
+        Contient notamment le plan du circuit (SVG) sous
+        circuit.tracks[].assets.info.path.
+        """
+        url = f"{EVENT_DETAIL_BASE}/{toad_api_uuid}"
+        try:
+            async with self._session.get(url, timeout=_TIMEOUT) as resp:
+                if resp.status != 200:
+                    raise MotoGPApiError(f"Réponse HTTP {resp.status} pour {url}")
+                return await resp.json(content_type=None)
+        except MotoGPApiError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            raise MotoGPApiError(f"Erreur réseau sur {url}: {err}") from err
+
+    @staticmethod
+    def extract_circuit_map(event_detail: dict[str, Any]) -> dict[str, Any]:
+        """Extrait les URLs du plan de circuit depuis la réponse /events/{id}.
+
+        On privilégie le tracé marqué "is_active": true ; à défaut, le
+        premier tracé disponible dans la liste.
+        """
+        circuit = event_detail.get("circuit") or {}
+        tracks = circuit.get("tracks") or []
+        if not tracks:
+            return {}
+
+        track = next((t for t in tracks if t.get("is_active")), tracks[0])
+        assets = track.get("assets")
+        if not isinstance(assets, dict):
+            # Certains tracés inactifs ont "assets": [] (liste vide) au
+            # lieu d'un objet {simple, info} : rien à en tirer.
+            return {}
+
+        info = assets.get("info") or {}
+        simple = assets.get("simple") or {}
+
+        return {
+            "circuit_map_svg": info.get("path"),
+            "circuit_map_png": simple.get("path"),
+            "circuit_left_corners": track.get("left_corners"),
+            "circuit_right_corners": track.get("right_corners"),
+        }
+
     async def async_get_next_event(self, category_name: str) -> dict[str, Any] | None:
         """Construit toutes les infos du prochain Grand Prix pour une catégorie.
 
@@ -168,6 +215,17 @@ class MotoGPApiClient:
         if race_entry is not None:
             race_start = _parse_session_date(race_entry)
 
+        circuit_map: dict[str, Any] = {}
+        toad_api_uuid = next_event.get("toad_api_uuid")
+        if toad_api_uuid:
+            try:
+                event_detail = await self.async_get_event_detail(toad_api_uuid)
+                circuit_map = self.extract_circuit_map(event_detail)
+            except MotoGPApiError as err:
+                # Ne doit jamais faire échouer tout le capteur : le plan du
+                # circuit est un "bonus", pas une donnée critique.
+                _LOGGER.debug("Impossible de récupérer le plan du circuit: %s", err)
+
         return {
             "event": next_event,
             "season_year": season.get("year"),
@@ -184,4 +242,5 @@ class MotoGPApiClient:
                 if next_session is not None
                 else None
             ),
+            **circuit_map,
         }

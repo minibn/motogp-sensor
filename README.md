@@ -64,7 +64,18 @@ Utilisation dans un tableau de bord (mode YAML de la carte) :
 type: custom:motogp-next-race-card
 entity: sensor.motogp_prochaine_course
 title: MotoGP
+show_sessions: true       # optionnel, true par défaut — false masque le programme du week-end
+show_circuit_map: true    # optionnel, true par défaut — false masque le plan du circuit
 ```
+
+### Plan du circuit
+
+Le capteur appelle un second endpoint (`/events/{toad_api_uuid}`, distinct
+de `/results/events`) pour récupérer le tracé du circuit fourni par
+l'API : `circuit.tracks[].assets.info.path` (SVG avec virages) et
+`assets.simple.path` (PNG, utilisé en repli si le SVG est absent). Cet
+appel est fait en "best effort" : s'il échoue, le reste du capteur
+continue de fonctionner normalement, seul le plan ne s'affiche pas.
 
 Ou via l'éditeur visuel : "Ajouter une carte" → cherchez
 "MotoGP - Prochaine course" dans la liste des cartes custom.

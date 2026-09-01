@@ -1,7 +1,6 @@
 {
-    "name": "MotoGP",
-    "render_readme": true,
-    "zip_release": false,
-    "homeassistant": "2026.6.4",
-    "hacs": "2.0.5"
+  "name": "MotoGP",
+  "render_readme": true,
+  "homeassistant": "2024.6.0",
+  "zip_release": false
 }

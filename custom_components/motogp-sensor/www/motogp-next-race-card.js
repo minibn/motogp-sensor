@@ -39,14 +39,22 @@ function formatDateTime(iso, opts) {
 
 class MotoGPNextRaceCard extends HTMLElement {
   static getStubConfig() {
-    return { entity: "sensor.motogp_prochaine_course" };
+    return { entity: "sensor.motogp_prochaine_course", show_sessions: true, show_circuit_map: true };
   }
 
   setConfig(config) {
     if (!config.entity) {
       throw new Error("Vous devez définir 'entity' (le capteur MotoGP).");
     }
-    this._config = config;
+    // show_sessions (optionnel, défaut true) : permet de masquer le
+    // programme du week-end en pied de carte, comme F1 Sensor le propose.
+    // show_circuit_map (optionnel, défaut true) : affiche le plan du
+    // circuit (tracé + virages) quand l'API le fournit.
+    this._config = {
+      show_sessions: true,
+      show_circuit_map: true,
+      ...config,
+    };
     ensureFontLoaded();
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
@@ -65,7 +73,7 @@ class MotoGPNextRaceCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 4;
+    return this._config && this._config.show_sessions === false ? 3 : 4;
   }
 
   connectedCallback() {
@@ -220,6 +228,31 @@ class MotoGPNextRaceCard extends HTMLElement {
       .session-row .time {
         color: var(--mgp-muted);
       }
+      .circuit-map-box {
+        background: #f3f2ee;
+        border-radius: 10px;
+        margin-top: 12px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .circuit-map-box img {
+        width: 100%;
+        max-height: 180px;
+        object-fit: contain;
+        display: block;
+      }
+      .circuit-map-caption {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        margin-top: 6px;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b6f76;
+      }
       .empty, .missing {
         padding: 12px 4px;
         color: var(--mgp-muted);
@@ -248,6 +281,10 @@ class MotoGPNextRaceCard extends HTMLElement {
     this._roundTotal = attrs.manche_total;
     this._season = attrs.saison;
     this._sessions = attrs.sessions || [];
+    this._circuitMapSvg = attrs.circuit_plan_svg || null;
+    this._circuitMapPng = attrs.circuit_plan_png || null;
+    this._cornersLeft = attrs.circuit_virages_gauche;
+    this._cornersRight = attrs.circuit_virages_droite;
     this._countdownTarget = this._nextSession ? this._nextSession.date : this._weekendStart;
     this._countdownLabel = this._nextSession ? this._nextSession.label : "le début du week-end";
 
@@ -262,6 +299,8 @@ class MotoGPNextRaceCard extends HTMLElement {
           <div class="subtitle">${this._circuit}${this._country ? " · " + this._country : ""}</div>
         </div>
       </div>
+
+      ${this._renderCircuitMap()}
 
       <div class="box">
         <div class="label">Compte à rebours</div>
@@ -286,6 +325,7 @@ class MotoGPNextRaceCard extends HTMLElement {
         </div>
       </div>
 
+      ${this._config.show_sessions ? `
       <div class="footer">
         <div class="footer-top">
           <div class="footer-title">Programme</div>
@@ -295,9 +335,28 @@ class MotoGPNextRaceCard extends HTMLElement {
           ${this._renderSessionRows()}
         </div>
       </div>
+      ` : ""}
     `;
 
     this._updateCountdown();
+  }
+
+  _renderCircuitMap() {
+    if (!this._config.show_circuit_map) return "";
+    const src = this._circuitMapSvg || this._circuitMapPng;
+    if (!src) return "";
+
+    const cornerText =
+      this._cornersLeft != null && this._cornersRight != null
+        ? `${this._cornersLeft} virages à gauche · ${this._cornersRight} à droite`
+        : "";
+
+    return `
+      <div class="circuit-map-box">
+        <img src="${src}" alt="Plan du circuit" loading="lazy" />
+        ${cornerText ? `<div class="circuit-map-caption"><span>${cornerText}</span></div>` : ""}
+      </div>
+    `;
   }
 
   _renderSessionRows() {

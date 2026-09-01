@@ -2,11 +2,16 @@
 from datetime import timedelta
 
 DOMAIN = "motogp"
+DOCUMENTATION_URL = "https://github.com/minibn/motogp-sensor"
 
 # Base de l'API "pulselive". Non officielle : vérifiez cette URL de temps
 # en temps (elle a existé sous les deux formes api.pulselive.motogp.com
 # et api.motogp.pulselive.com selon les périodes).
 API_BASE = "https://api.pulselive.motogp.com/motogp/v1"
+# Endpoint distinct de /results/, donne les détails "grand public" d'un
+# événement (dates réelles, plan du circuit...). Requiert le
+# "toad_api_uuid" de l'événement (obtenu via /results/events).
+EVENT_DETAIL_BASE = "https://api.pulselive.motogp.com/motogp/v1/events"
 
 ENDPOINT_SEASONS = "/results/seasons"
 ENDPOINT_EVENTS = "/results/events"

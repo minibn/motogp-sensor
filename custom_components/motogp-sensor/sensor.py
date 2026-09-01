@@ -92,4 +92,8 @@ class MotoGPNextRaceSensor(CoordinatorEntity[MotoGPDataUpdateCoordinator], Senso
             "prochaine_session": data.get("next_session"),
             "jours_restants": jours_restants,
             "sessions": data.get("sessions", []),
+            "circuit_plan_svg": data.get("circuit_map_svg"),
+            "circuit_plan_png": data.get("circuit_map_png"),
+            "circuit_virages_gauche": data.get("circuit_left_corners"),
+            "circuit_virages_droite": data.get("circuit_right_corners"),
         }

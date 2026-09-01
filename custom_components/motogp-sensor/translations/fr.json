@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MotoGP",
+        "description": "Choisissez la catégorie du championnat à suivre.",
+        "data": {
+          "category_name": "Catégorie"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de joindre l'API MotoGP."
+    },
+    "abort": {
+      "already_configured": "Cette catégorie est déjà configurée."
+    }
+  }
+}
