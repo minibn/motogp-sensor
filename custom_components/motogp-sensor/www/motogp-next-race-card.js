@@ -170,18 +170,21 @@ class MotoGPNextRaceCard extends HTMLElement {
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--mgp-muted);
+        line-height: 1.2;
       }
       .countdown-value {
         font-family: "Oswald", "Inter", system-ui, sans-serif;
         font-variant-numeric: tabular-nums;
         font-weight: 600;
         font-size: 24px;
-        margin-top: 2px;
+        line-height: 1.15;
+        margin-top: 0;
       }
       .countdown-sub {
         font-size: 12px;
         color: var(--mgp-muted);
-        margin-top: 2px;
+        line-height: 1.2;
+        margin-top: 0;
       }
       .info-grid {
         display: grid;
@@ -315,8 +318,8 @@ class MotoGPNextRaceCard extends HTMLElement {
     this._circuitMapPng = attrs.circuit_plan_png || null;
     this._cornersLeft = attrs.circuit_virages_gauche;
     this._cornersRight = attrs.circuit_virages_droite;
-    this._countdownTarget = this._nextSession ? this._nextSession.date : this._weekendStart;
-    this._countdownLabel = this._nextSession ? this._nextSession.label : "le début du week-end";
+    this._countdownTarget = this._raceStart || this._weekendStart;
+    this._countdownLabel = this._raceStart ? "le départ de la course" : "le début du week-end";
 
     const root = this.shadowRoot.querySelector(".card");
     if (!root) return;
@@ -433,7 +436,7 @@ class MotoGPNextRaceCard extends HTMLElement {
     if (diff <= 0) {
       slot.innerHTML = `
         <div class="countdown-value">🏁 En cours</div>
-        <div class="countdown-sub">Session en cours ou terminée</div>
+        <div class="countdown-sub">Course en cours ou terminée</div>
       `;
       return;
     }
