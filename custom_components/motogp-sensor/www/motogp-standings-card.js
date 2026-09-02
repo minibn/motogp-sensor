@@ -161,10 +161,17 @@ class MotoGPStandingsCard extends HTMLElement {
         gap: 8px;
       }
       .bib {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 20px;
+        padding: 0 4px;
+        border-radius: 4px;
+        font-family: "Oswald", "Inter", system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 12px;
         font-variant-numeric: tabular-nums;
-        color: var(--mgp-muted);
-        font-size: 11px;
-        min-width: 22px;
       }
       .flag {
         font-size: 14px;
@@ -244,13 +251,15 @@ class MotoGPStandingsCard extends HTMLElement {
 
   _renderRow(r) {
     const posClass = r.position === 1 ? "p1" : r.position === 2 ? "p2" : r.position === 3 ? "p3" : "";
+    const bg = r.team_color || "#3a3d44";
+    const fg = r.team_text_color || "#ffffff";
     return `
       <tr>
         <td class="pos ${posClass}">${r.position != null ? r.position : "—"}</td>
         <td>
           <div class="rider-cell">
             <span class="flag">${countryFlagEmoji(r.country_iso)}</span>
-            <span class="bib">#${r.number != null ? r.number : "—"}</span>
+            <span class="bib" style="background:${bg}; color:${fg};">${r.number != null ? r.number : "—"}</span>
             <span>
               <span class="rider-name">${r.name || "—"}</span>
               ${r.team ? `<span class="rider-team">${r.team}</span>` : ""}

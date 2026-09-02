@@ -13,6 +13,7 @@ from .const import (
     ENDPOINT_EVENTS,
     ENDPOINT_SEASONS,
     ENDPOINT_SESSIONS,
+    ENDPOINT_TEAMS,
     ENDPOINT_WORLD_STANDINGS,
     EVENT_DETAIL_BASE,
     STANDINGS_API_BASE,
@@ -114,6 +115,28 @@ class MotoGPApiClient:
         except Exception as err:  # noqa: BLE001
             raise MotoGPApiError(f"Erreur réseau sur {url}: {err}") from err
 
+    async def async_get_team_colors(
+        self, category_uuid: str, season_year: int
+    ) -> dict[str, dict[str, str]]:
+        """Couleurs officielles par équipe : {team_name: {color, text_color}}.
+
+        Endpoint distinct de /results/ (base v1 mais chemin /teams direct),
+        paramétré par categoryUuid + seasonYear (et non seasonUuid).
+        """
+        teams = await self._get(
+            ENDPOINT_TEAMS, {"categoryUuid": category_uuid, "seasonYear": season_year}
+        )
+        colors: dict[str, dict[str, str]] = {}
+        for team in teams or []:
+            name = team.get("name")
+            if not name:
+                continue
+            colors[name] = {
+                "color": team.get("color"),
+                "text_color": team.get("text_color"),
+            }
+        return colors
+
     async def async_get_standings(
         self, category_name: str, standing_type: str = "rider"
     ) -> dict[str, Any]:
@@ -121,7 +144,8 @@ class MotoGPApiClient:
 
         Retourne {"season_year", "category", "standings": [...]}, chaque
         élément de "standings" ayant : position, number, name, points,
-        team, constructor, country_iso, position_change.
+        team, constructor, country_iso, position_change, team_color,
+        team_text_color.
         """
         season = await self.async_get_current_season()
         season_uuid = season["id"]
@@ -136,21 +160,33 @@ class MotoGPApiClient:
         raw = await self.async_get_world_standings(season_uuid, category["id"], standing_type)
         entries = (raw.get("classification") or {}).get(standing_type) or []
 
+        team_colors: dict[str, dict[str, str]] = {}
+        try:
+            team_colors = await self.async_get_team_colors(category["id"], season.get("year"))
+        except MotoGPApiError as err:
+            # Les couleurs sont un "bonus" visuel : une panne sur cet appel
+            # ne doit pas empêcher le classement de s'afficher.
+            _LOGGER.debug("Impossible de récupérer les couleurs d'équipe: %s", err)
+
         standings = []
         for entry in entries:
             rider = entry.get("rider") or {}
             constructor = entry.get("constructor") or {}
             country = rider.get("country") or {}
+            team_name = entry.get("team_name")
+            colors = team_colors.get(team_name, {})
             standings.append(
                 {
                     "position": entry.get("position"),
                     "number": rider.get("number"),
                     "name": rider.get("full_name"),
                     "points": entry.get("points"),
-                    "team": entry.get("team_name"),
+                    "team": team_name,
                     "constructor": constructor.get("name"),
                     "country_iso": country.get("iso"),
                     "position_change": entry.get("position_change"),
+                    "team_color": colors.get("color"),
+                    "team_text_color": colors.get("text_color"),
                 }
             )
 
