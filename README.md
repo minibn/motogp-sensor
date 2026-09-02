@@ -66,6 +66,8 @@ entity: sensor.motogp_prochaine_course
 title: MotoGP
 show_sessions: true       # optionnel, true par défaut — false masque le programme du week-end
 show_circuit_map: true    # optionnel, true par défaut — false masque le plan du circuit
+circuit_map_zoom: 1.35    # optionnel, 1.35 par défaut — niveau de zoom du plan du circuit
+show_info_grid: true      # optionnel, true par défaut — false masque le bloc Prochaine session / Début course / Manche
 ```
 
 ### Plan du circuit

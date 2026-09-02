@@ -39,7 +39,13 @@ function formatDateTime(iso, opts) {
 
 class MotoGPNextRaceCard extends HTMLElement {
   static getStubConfig() {
-    return { entity: "sensor.motogp_prochaine_course", show_sessions: true, show_circuit_map: true };
+    return {
+      entity: "sensor.motogp_prochaine_course",
+      show_sessions: true,
+      show_circuit_map: true,
+      circuit_map_zoom: 1.35,
+      show_info_grid: true,
+    };
   }
 
   setConfig(config) {
@@ -50,9 +56,15 @@ class MotoGPNextRaceCard extends HTMLElement {
     // programme du week-end en pied de carte, comme F1 Sensor le propose.
     // show_circuit_map (optionnel, défaut true) : affiche le plan du
     // circuit (tracé + virages) quand l'API le fournit.
+    // circuit_map_zoom (optionnel, défaut 1.35) : niveau de zoom appliqué
+    // à l'image du plan du circuit.
+    // show_info_grid (optionnel, défaut true) : affiche le bloc
+    // Prochaine session / Début course / Manche.
     this._config = {
       show_sessions: true,
       show_circuit_map: true,
+      circuit_map_zoom: 1.35,
+      show_info_grid: true,
       ...config,
     };
     ensureFontLoaded();
@@ -241,7 +253,7 @@ class MotoGPNextRaceCard extends HTMLElement {
       }
       .circuit-map-frame {
         width: 100%;
-        height: 225px;
+        height: 170px;
         overflow: hidden;
         display: flex;
         align-items: center;
@@ -251,7 +263,6 @@ class MotoGPNextRaceCard extends HTMLElement {
         width: 100%;
         height: 100%;
         object-fit: contain;
-        transform: scale(1.8);
         /* Le SVG source est en traits sombres sur fond clair : on
            l'inverse pour obtenir un tracé blanc sur fond noir, tout en
            conservant la teinte des éléments rouges (points de repère)
@@ -320,6 +331,7 @@ class MotoGPNextRaceCard extends HTMLElement {
         <div class="countdown-slot"></div>
       </div>
 
+      ${this._config.show_info_grid ? `
       <div class="info-grid">
         <div class="info-cell">
           <div class="label">Prochaine session</div>
@@ -337,6 +349,7 @@ class MotoGPNextRaceCard extends HTMLElement {
           <div class="sub">${this._season ? "Saison " + this._season : ""}</div>
         </div>
       </div>
+      ` : ""}
 
       ${this._config.show_sessions ? `
       <div class="footer">
@@ -366,10 +379,12 @@ class MotoGPNextRaceCard extends HTMLElement {
         ? `${this._cornersLeft} virages à gauche · ${this._cornersRight} à droite`
         : "";
 
+    const zoom = Number(this._config.circuit_map_zoom) || 1.35;
+
     return `
       <div class="circuit-map-box">
         <div class="circuit-map-frame">
-          <img src="${src}" alt="Plan du circuit" loading="lazy" />
+          <img src="${src}" alt="Plan du circuit" loading="lazy" style="transform: scale(${zoom});" />
         </div>
         ${cornerText ? `<div class="circuit-map-caption"><span>${cornerText}</span></div>` : ""}
       </div>
