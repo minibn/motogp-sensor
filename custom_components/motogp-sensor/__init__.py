@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
 
-CARD_VERSION = "2"
+CARD_VERSION = "3"
 CARD_URL_PREFIX = "/motogp_card"
 CARD_DIR_RELATIVE = "www"
 CARD_FILES = [

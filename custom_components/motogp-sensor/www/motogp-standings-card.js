@@ -37,6 +37,10 @@ class MotoGPStandingsCard extends HTMLElement {
     return { entity: "sensor.motogp_classement_pilotes", limit: 10 };
   }
 
+  static getConfigElement() {
+    return document.createElement("motogp-standings-card-editor");
+  }
+
   setConfig(config) {
     if (!config.entity) {
       throw new Error("Vous devez définir 'entity' (le capteur de classement MotoGP).");
@@ -258,6 +262,70 @@ class MotoGPStandingsCard extends HTMLElement {
     `;
   }
 }
+
+/**
+ * Éditeur visuel pour motogp-standings-card, sur le même principe que
+ * celui de motogp-next-race-card (via <ha-form>).
+ */
+class MotoGPStandingsCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  connectedCallback() {
+    this._render();
+  }
+
+  _schema() {
+    return [
+      { name: "entity", required: true, selector: { entity: { domain: "sensor" } } },
+      { name: "title", selector: { text: {} } },
+      { name: "limit", selector: { number: { min: 0, max: 30, step: 1, mode: "box" } } },
+    ];
+  }
+
+  _labels(schemaName) {
+    const labels = {
+      entity: "Entité (capteur de classement MotoGP)",
+      title: "Titre (optionnel)",
+      limit: "Nombre de lignes (0 = toutes)",
+    };
+    return labels[schemaName] || schemaName;
+  }
+
+  _render() {
+    if (!this._hass) return;
+
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._config = ev.detail.value;
+        this.dispatchEvent(
+          new CustomEvent("config-changed", {
+            detail: { config: this._config },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+      this.appendChild(this._form);
+    }
+
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = this._schema();
+    this._form.computeLabel = (schema) => this._labels(schema.name);
+  }
+}
+
+customElements.define("motogp-standings-card-editor", MotoGPStandingsCardEditor);
 
 customElements.define("motogp-standings-card", MotoGPStandingsCard);
 

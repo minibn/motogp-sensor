@@ -48,6 +48,10 @@ class MotoGPNextRaceCard extends HTMLElement {
     };
   }
 
+  static getConfigElement() {
+    return document.createElement("motogp-next-race-card-editor");
+  }
+
   setConfig(config) {
     if (!config.entity) {
       throw new Error("Vous devez définir 'entity' (le capteur MotoGP).");
@@ -445,6 +449,81 @@ class MotoGPNextRaceCard extends HTMLElement {
     `;
   }
 }
+
+/**
+ * Éditeur visuel (formulaire de configuration) pour motogp-next-race-card.
+ * S'appuie sur <ha-form>, le composant de formulaire natif de Home
+ * Assistant, pour obtenir automatiquement le style et les widgets
+ * standards (sélecteur d'entité, interrupteurs, champ numérique...).
+ */
+class MotoGPNextRaceCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  connectedCallback() {
+    this._render();
+  }
+
+  _schema() {
+    return [
+      { name: "entity", required: true, selector: { entity: { domain: "sensor" } } },
+      { name: "title", selector: { text: {} } },
+      { name: "show_sessions", selector: { boolean: {} } },
+      { name: "show_circuit_map", selector: { boolean: {} } },
+      {
+        name: "circuit_map_zoom",
+        selector: { number: { min: 1, max: 3, step: 0.05, mode: "slider" } },
+      },
+      { name: "show_info_grid", selector: { boolean: {} } },
+    ];
+  }
+
+  _labels(schemaName) {
+    const labels = {
+      entity: "Entité (capteur MotoGP)",
+      title: "Titre (optionnel)",
+      show_sessions: "Afficher le programme du week-end",
+      show_circuit_map: "Afficher le plan du circuit",
+      circuit_map_zoom: "Zoom du plan du circuit",
+      show_info_grid: "Afficher prochaine session / début course / manche",
+    };
+    return labels[schemaName] || schemaName;
+  }
+
+  _render() {
+    if (!this._hass) return;
+
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._config = ev.detail.value;
+        this.dispatchEvent(
+          new CustomEvent("config-changed", {
+            detail: { config: this._config },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+      this.appendChild(this._form);
+    }
+
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = this._schema();
+    this._form.computeLabel = (schema) => this._labels(schema.name);
+  }
+}
+
+customElements.define("motogp-next-race-card-editor", MotoGPNextRaceCardEditor);
 
 customElements.define("motogp-next-race-card", MotoGPNextRaceCard);
 
