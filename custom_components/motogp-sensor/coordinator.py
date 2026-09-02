@@ -37,3 +37,23 @@ class MotoGPDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed("Aucun événement à venir trouvé")
 
         return data
+
+
+class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Récupère et met en cache le classement pilotes/constructeurs."""
+
+    def __init__(self, hass: HomeAssistant, category_name: str) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_standings",
+            update_interval=DEFAULT_SCAN_INTERVAL,
+        )
+        self._category_name = category_name
+        self.client = MotoGPApiClient(async_get_clientsession(hass))
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        try:
+            return await self.client.async_get_standings(self._category_name)
+        except MotoGPApiError as err:
+            raise UpdateFailed(str(err)) from err

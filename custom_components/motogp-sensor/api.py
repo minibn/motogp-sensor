@@ -13,7 +13,9 @@ from .const import (
     ENDPOINT_EVENTS,
     ENDPOINT_SEASONS,
     ENDPOINT_SESSIONS,
+    ENDPOINT_WORLD_STANDINGS,
     EVENT_DETAIL_BASE,
+    STANDINGS_API_BASE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,6 +95,70 @@ class MotoGPApiClient:
 
     async def async_get_categories(self, season_uuid: str) -> list[dict[str, Any]]:
         return await self._get(ENDPOINT_CATEGORIES, {"seasonUuid": season_uuid})
+
+    async def async_get_world_standings(
+        self, season_uuid: str, category_uuid: str, standing_type: str = "rider"
+    ) -> dict[str, Any]:
+        """Appelle l'API v2 des classements (base différente du reste)."""
+        url = f"{STANDINGS_API_BASE}{ENDPOINT_WORLD_STANDINGS}"
+        params = {"type": standing_type, "season": season_uuid, "category": category_uuid}
+        try:
+            async with self._session.get(url, params=params, timeout=_TIMEOUT) as resp:
+                if resp.status != 200:
+                    raise MotoGPApiError(
+                        f"Réponse HTTP {resp.status} pour {url} (params={params})"
+                    )
+                return await resp.json(content_type=None)
+        except MotoGPApiError:
+            raise
+        except Exception as err:  # noqa: BLE001
+            raise MotoGPApiError(f"Erreur réseau sur {url}: {err}") from err
+
+    async def async_get_standings(
+        self, category_name: str, standing_type: str = "rider"
+    ) -> dict[str, Any]:
+        """Classement simplifié pour le tableau de bord.
+
+        Retourne {"season_year", "category", "standings": [...]}, chaque
+        élément de "standings" ayant : position, number, name, points,
+        team, constructor, country_iso, position_change.
+        """
+        season = await self.async_get_current_season()
+        season_uuid = season["id"]
+
+        categories = await self.async_get_categories(season_uuid)
+        category = next(
+            (c for c in categories if c.get("name") == category_name), None
+        )
+        if category is None:
+            raise MotoGPApiError(f"Catégorie introuvable : {category_name}")
+
+        raw = await self.async_get_world_standings(season_uuid, category["id"], standing_type)
+        entries = (raw.get("classification") or {}).get(standing_type) or []
+
+        standings = []
+        for entry in entries:
+            rider = entry.get("rider") or {}
+            constructor = entry.get("constructor") or {}
+            country = rider.get("country") or {}
+            standings.append(
+                {
+                    "position": entry.get("position"),
+                    "number": rider.get("number"),
+                    "name": rider.get("full_name"),
+                    "points": entry.get("points"),
+                    "team": entry.get("team_name"),
+                    "constructor": constructor.get("name"),
+                    "country_iso": country.get("iso"),
+                    "position_change": entry.get("position_change"),
+                }
+            )
+
+        return {
+            "season_year": season.get("year"),
+            "category": category_name,
+            "standings": standings,
+        }
 
     async def async_get_events(
         self, season_uuid: str, is_finished: bool | None = None

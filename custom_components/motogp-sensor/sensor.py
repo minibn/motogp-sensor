@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN
-from .coordinator import MotoGPDataUpdateCoordinator
+from .coordinator import MotoGPDataUpdateCoordinator, MotoGPStandingsCoordinator
 
 
 async def async_setup_entry(
@@ -20,8 +20,13 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: MotoGPDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([MotoGPNextRaceSensor(coordinator, entry)])
+    coordinators = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities(
+        [
+            MotoGPNextRaceSensor(coordinators["next_race"], entry),
+            MotoGPStandingsSensor(coordinators["standings"], entry),
+        ]
+    )
 
 
 class MotoGPNextRaceSensor(CoordinatorEntity[MotoGPDataUpdateCoordinator], SensorEntity):
@@ -96,4 +101,43 @@ class MotoGPNextRaceSensor(CoordinatorEntity[MotoGPDataUpdateCoordinator], Senso
             "circuit_plan_png": data.get("circuit_map_png"),
             "circuit_virages_gauche": data.get("circuit_left_corners"),
             "circuit_virages_droite": data.get("circuit_right_corners"),
+        }
+
+
+class MotoGPStandingsSensor(CoordinatorEntity[MotoGPStandingsCoordinator], SensorEntity):
+    """État = pilote en tête du championnat, attributs = classement complet."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Classement pilotes"
+    _attr_icon = "mdi:podium-gold"
+    _attr_attribution = ATTRIBUTION
+
+    def __init__(self, coordinator: MotoGPStandingsCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_standings"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="MotoGP",
+            manufacturer="Dorna Sports (données non officielles)",
+        )
+
+    @property
+    def _data(self) -> dict[str, Any]:
+        return self.coordinator.data or {}
+
+    @property
+    def _standings(self) -> list[dict[str, Any]]:
+        return self._data.get("standings", [])
+
+    @property
+    def native_value(self) -> str | None:
+        leader = next((s for s in self._standings if s.get("position") == 1), None)
+        return leader.get("name") if leader else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "saison": self._data.get("season_year"),
+            "categorie": self._data.get("category"),
+            "classement": self._standings,
         }

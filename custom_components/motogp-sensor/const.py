@@ -18,6 +18,10 @@ ENDPOINT_EVENTS = "/results/events"
 ENDPOINT_CATEGORIES = "/results/categories"
 ENDPOINT_SESSIONS = "/results/sessions"
 
+# L'API des classements est en v2, contrairement au reste (v1).
+STANDINGS_API_BASE = "https://api.pulselive.motogp.com/motogp/v2"
+ENDPOINT_WORLD_STANDINGS = "/results/world-standings"
+
 # Nom de la catégorie que l'on veut suivre par défaut.
 DEFAULT_CATEGORY_NAME = "MotoGP™"
 

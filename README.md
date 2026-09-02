@@ -19,9 +19,13 @@ dans `api.py` et `sensor.py`).
 4. Paramètres → Appareils et services → Ajouter une intégration → "MotoGP",
    choisissez la catégorie (MotoGP / Moto2 / Moto3).
 
-Cela crée `sensor.motogp_prochaine_course` avec :
-- état = nom du Grand Prix
-- attributs : `circuit`, `pays`, `date_debut`, `jours_restants`, `sessions`
+Cela crée deux capteurs :
+- `sensor.motogp_prochaine_course` : état = nom du Grand Prix, attributs =
+  `circuit`, `pays`, `date_debut`, `jours_restants`, `sessions`, plan du
+  circuit...
+- `sensor.motogp_classement_pilotes` : état = nom du pilote en tête du
+  championnat, attribut `classement` = liste ordonnée (position, numéro,
+  nom, points, équipe, position_change...).
 
 ## Avant de coder : valider l'API vous-même
 
@@ -38,6 +42,20 @@ GET https://api.pulselive.motogp.com/motogp/v1/results/sessions?eventUuid=<id>&c
 Ajustez ensuite les clés (`date_start`, `circuit.name`, etc.) dans `api.py`
 et `sensor.py` selon ce que vous observez réellement — c'est l'étape la plus
 importante, plus que le code lui-même.
+
+## Carte Lovelace custom "MotoGP - Classement pilotes"
+
+Le fichier `custom_components/motogp/www/motogp-standings-card.js` affiche
+le classement du championnat sous forme de tableau (position, drapeau,
+numéro, pilote, équipe, points, évolution de position). Enregistrée
+automatiquement, au même titre que la carte "Prochaine course".
+
+```yaml
+type: custom:motogp-standings-card
+entity: sensor.motogp_classement_pilotes
+title: Classement MotoGP    # optionnel
+limit: 10                   # optionnel, 0/absent = tout afficher
+```
 
 ## Carte Lovelace custom "MotoGP - Prochaine course"
 
