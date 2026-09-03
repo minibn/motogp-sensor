@@ -9,6 +9,7 @@ from aiohttp import ClientSession, ClientTimeout
 
 from .const import (
     API_BASE,
+    ENDPOINT_BROADCAST_CATEGORIES,
     ENDPOINT_CATEGORIES,
     ENDPOINT_EVENTS,
     ENDPOINT_SEASONS,
@@ -60,6 +61,13 @@ def _parse_session_date(session: dict[str, Any]) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _normalize_category_name(name: str | None) -> str:
+    """'MotoGP™' et 'MotoGP' doivent être reconnus comme identiques : les
+    deux API n'utilisent pas la même convention de nommage (avec ou sans
+    le symbole ™)."""
+    return (name or "").replace("™", "").strip().casefold()
 
 
 class MotoGPApiError(Exception):
@@ -115,6 +123,28 @@ class MotoGPApiClient:
         except Exception as err:  # noqa: BLE001
             raise MotoGPApiError(f"Erreur réseau sur {url}: {err}") from err
 
+    async def async_get_broadcast_category_id(
+        self, category_name: str, season_year: int
+    ) -> str | None:
+        """Trouve l'ID de catégorie attendu par /teams (API "Broadcast"),
+        DIFFÉRENT de celui renvoyé par /results/categories pour la même
+        catégorie. category_name utilise la convention /results/ (avec
+        ™) ; on normalise pour matcher la convention broadcast (sans ™).
+        """
+        categories = await self._get(
+            ENDPOINT_BROADCAST_CATEGORIES, {"seasonYear": season_year}
+        )
+        target = _normalize_category_name(category_name)
+        match = next(
+            (
+                c
+                for c in categories or []
+                if _normalize_category_name(c.get("name")) == target
+            ),
+            None,
+        )
+        return match["id"] if match else None
+
     async def async_get_team_colors(
         self, category_uuid: str, season_year: int
     ) -> dict[str, dict[str, str]]:
@@ -162,7 +192,13 @@ class MotoGPApiClient:
 
         team_colors: dict[str, dict[str, str]] = {}
         try:
-            team_colors = await self.async_get_team_colors(category["id"], season.get("year"))
+            broadcast_category_id = await self.async_get_broadcast_category_id(
+                category_name, season.get("year")
+            )
+            if broadcast_category_id:
+                team_colors = await self.async_get_team_colors(
+                    broadcast_category_id, season.get("year")
+                )
         except MotoGPApiError as err:
             # Les couleurs sont un "bonus" visuel : une panne sur cet appel
             # ne doit pas empêcher le classement de s'afficher.

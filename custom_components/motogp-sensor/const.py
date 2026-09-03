@@ -20,6 +20,10 @@ ENDPOINT_SESSIONS = "/results/sessions"
 # Endpoint distinct de /results/ : liste des équipes d'une catégorie pour
 # une année donnée, avec leur couleur officielle (color/text_color).
 ENDPOINT_TEAMS = "/teams"
+# Endpoint "Broadcast" (distinct de /results/categories) : donne l'ID de
+# catégorie attendu par /teams, qui n'est PAS le même que celui renvoyé
+# par /results/categories pour la même catégorie.
+ENDPOINT_BROADCAST_CATEGORIES = "/categories"
 
 # L'API des classements est en v2, contrairement au reste (v1).
 STANDINGS_API_BASE = "https://api.pulselive.motogp.com/motogp/v2"
