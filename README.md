@@ -9,6 +9,9 @@ garantie dans le temps : vérifiez la forme réelle des réponses JSON avant de
 faire confiance aux noms de champs utilisés dans le code (voir commentaires
 dans `api.py` et `sensor.py`).
 
+Le développement a été fait à l'aide d'IA, le code ne sera peut être pas le plus propre à lire, 
+mais c'était la solution la plus simple pour avoir un projet fonctionnel rapidement pour permettre de remonter les informations dans HA
+
 ## Installation
 
 1. Publiez ce dossier tel quel dans un dépôt GitHub public
