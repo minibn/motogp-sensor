@@ -63,6 +63,20 @@ def _parse_session_date(session: dict[str, Any]) -> datetime | None:
     return parsed
 
 
+def _normalize_team_name(name: str | None) -> str:
+    """Normalise un nom d'équipe pour la comparaison entre APIs.
+
+    Les deux API ne sont pas toujours parfaitement cohérentes sur les
+    noms d'équipe (ex: "Monster Energy Yamaha MotoGP Team" côté
+    classement contre "Monster Energy Yamaha MotoGP" côté /teams) : on
+    retire un éventuel suffixe "Team" en plus de la casse/espaces.
+    """
+    normalized = (name or "").strip().casefold()
+    if normalized.endswith(" team"):
+        normalized = normalized[: -len(" team")].strip()
+    return normalized
+
+
 def _normalize_category_name(name: str | None) -> str:
     """'MotoGP™' et 'MotoGP' doivent être reconnus comme identiques : les
     deux API n'utilisent pas la même convention de nommage (avec ou sans
@@ -147,25 +161,33 @@ class MotoGPApiClient:
 
     async def async_get_team_colors(
         self, category_uuid: str, season_year: int
-    ) -> dict[str, dict[str, str]]:
-        """Couleurs officielles par équipe : {team_name: {color, text_color}}.
+    ) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]]]:
+        """Couleurs officielles par équipe (et, en repli, par constructeur).
 
-        Endpoint distinct de /results/ (base v1 mais chemin /teams direct),
-        paramétré par categoryUuid + seasonYear (et non seasonUuid).
+        Retourne (colors_by_team, colors_by_constructor), chacun indexé
+        respectivement par nom d'équipe normalisé et par nom de
+        constructeur. Endpoint distinct de /results/ (base v1 mais chemin
+        /teams direct), paramétré par categoryUuid + seasonYear (et non
+        seasonUuid).
         """
         teams = await self._get(
             ENDPOINT_TEAMS, {"categoryUuid": category_uuid, "seasonYear": season_year}
         )
-        colors: dict[str, dict[str, str]] = {}
+        colors_by_team: dict[str, dict[str, str]] = {}
+        colors_by_constructor: dict[str, dict[str, str]] = {}
         for team in teams or []:
             name = team.get("name")
             if not name:
                 continue
-            colors[name] = {
-                "color": team.get("color"),
-                "text_color": team.get("text_color"),
-            }
-        return colors
+            entry = {"color": team.get("color"), "text_color": team.get("text_color")}
+            colors_by_team[_normalize_team_name(name)] = entry
+            constructor = (team.get("constructor") or {}).get("name")
+            if constructor and constructor not in colors_by_constructor:
+                # Première équipe rencontrée pour ce constructeur : sert de
+                # repli si une équipe précise n'est pas retrouvée (ex:
+                # équipe satellite absente de /teams).
+                colors_by_constructor[constructor] = entry
+        return colors_by_team, colors_by_constructor
 
     async def async_get_standings(
         self, category_name: str, standing_type: str = "rider"
@@ -190,13 +212,14 @@ class MotoGPApiClient:
         raw = await self.async_get_world_standings(season_uuid, category["id"], standing_type)
         entries = (raw.get("classification") or {}).get(standing_type) or []
 
-        team_colors: dict[str, dict[str, str]] = {}
+        team_colors_by_team: dict[str, dict[str, str]] = {}
+        team_colors_by_constructor: dict[str, dict[str, str]] = {}
         try:
             broadcast_category_id = await self.async_get_broadcast_category_id(
                 category_name, season.get("year")
             )
             if broadcast_category_id:
-                team_colors = await self.async_get_team_colors(
+                team_colors_by_team, team_colors_by_constructor = await self.async_get_team_colors(
                     broadcast_category_id, season.get("year")
                 )
         except MotoGPApiError as err:
@@ -210,7 +233,10 @@ class MotoGPApiClient:
             constructor = entry.get("constructor") or {}
             country = rider.get("country") or {}
             team_name = entry.get("team_name")
-            colors = team_colors.get(team_name, {})
+            constructor_name = constructor.get("name")
+            colors = team_colors_by_team.get(
+                _normalize_team_name(team_name)
+            ) or team_colors_by_constructor.get(constructor_name, {})
             standings.append(
                 {
                     "position": entry.get("position"),
@@ -218,7 +244,7 @@ class MotoGPApiClient:
                     "name": rider.get("full_name"),
                     "points": entry.get("points"),
                     "team": team_name,
-                    "constructor": constructor.get("name"),
+                    "constructor": constructor_name,
                     "country_iso": country.get("iso"),
                     "position_change": entry.get("position_change"),
                     "team_color": colors.get("color"),
