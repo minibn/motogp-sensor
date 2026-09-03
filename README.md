@@ -44,6 +44,7 @@ et `sensor.py` selon ce que vous observez réellement — c'est l'étape la plus
 importante, plus que le code lui-même.
 
 ## Carte Lovelace custom "MotoGP - Classement pilotes"
+<img width="499" height="868" alt="image" src="https://github.com/user-attachments/assets/336dc0bc-e5b6-4c4f-82af-3e24c0becd30" />
 
 Le fichier `custom_components/motogp/www/motogp-standings-card.js` affiche
 le classement du championnat sous forme de tableau (position, drapeau,
@@ -58,6 +59,7 @@ limit: 10                   # optionnel, 0/absent = tout afficher
 ```
 
 ## Carte Lovelace custom "MotoGP - Prochaine course"
+<img width="503" height="761" alt="image" src="https://github.com/user-attachments/assets/0ba039ec-19fb-4fb3-8461-9cf02fd33130" />
 
 Le fichier `custom_components/motogp/www/motogp-next-race-card.js` est une
 carte Lovelace custom (Web Component, sans étape de build) qui affiche :
