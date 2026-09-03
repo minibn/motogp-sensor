@@ -129,13 +129,13 @@ class MotoGPNextRaceCard extends HTMLElement {
       }
       .card {
         font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-        padding: 16px 18px 18px;
+        padding: 12px 14px 14px;
       }
       .header {
         display: flex;
         align-items: flex-start;
         gap: 10px;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
       }
       .flag {
         font-size: 22px;
@@ -162,8 +162,8 @@ class MotoGPNextRaceCard extends HTMLElement {
         background: var(--mgp-surface);
         border: 1px solid var(--mgp-border);
         border-radius: 10px;
-        padding: 10px 12px;
-        margin-top: 12px;
+        padding: 8px 10px;
+        margin-top: 8px;
       }
       .label {
         font-size: 10px;
