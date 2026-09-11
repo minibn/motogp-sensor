@@ -328,23 +328,37 @@ class MotoGPApiClient:
         affichées (week-end, prochaine session, départ course) sont toutes
         dérivées des sessions, dont le schéma est confirmé par la doc de
         l'API Results.
+
+        On récupère la liste complète des événements (sans filtre
+        isFinished) et on se base sur le champ "status"
+        (FINISHED / CURRENT / NOT-STARTED) plutôt que sur isFinished=false,
+        qui exclut à tort le Grand Prix du week-end une fois sa première
+        session commencée.
         """
         season = await self.async_get_current_season()
         season_uuid = season["id"]
 
-        finished_events = await self.async_get_events(season_uuid, is_finished=True)
-        upcoming_events = await self.async_get_events(season_uuid, is_finished=False)
-        if not upcoming_events:
-            return None
+        all_events = await self.async_get_events(season_uuid)
 
         # On ignore les séances de tests pour la numérotation "manche X/Y"
         # et pour le choix du prochain évènement, quand l'info est présente.
-        finished_real = [e for e in finished_events if not e.get("test")]
-        upcoming_real = [e for e in upcoming_events if not e.get("test")] or upcoming_events
+        finished_real = [
+            e for e in all_events if e.get("status") == "FINISHED" and not e.get("test")
+        ]
+        remaining = [e for e in all_events if e.get("status") in ("CURRENT", "NOT-STARTED")]
+        remaining_real = [e for e in remaining if not e.get("test")] or remaining
 
-        next_event = upcoming_real[0]
+        if not remaining_real:
+            return None
+
+        # Priorité au Grand Prix en cours (première session déjà démarrée),
+        # sinon le tout prochain à venir.
+        next_event = next(
+            (e for e in remaining_real if e.get("status") == "CURRENT"),
+            remaining_real[0],
+        )
         round_number = len(finished_real) + 1
-        total_rounds = len(finished_real) + len(upcoming_real)
+        total_rounds = len(finished_real) + len(remaining_real)
 
         categories = await self.async_get_categories(season_uuid)
         category = next(
