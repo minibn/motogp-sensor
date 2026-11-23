@@ -73,16 +73,6 @@ def _parse_event_date(raw: Any) -> "date | None":
         return None
 
 
-def _parse_event_date(raw: Any) -> "date | None":
-    """Lit date_start/date_end d'un événement (ex: "2026-10-25")."""
-    if not raw or not isinstance(raw, str):
-        return None
-    try:
-        return date.fromisoformat(raw[:10])
-    except ValueError:
-        return None
-
-
 def _normalize_team_name(name: str | None) -> str:
     """Normalise un nom d'équipe pour la comparaison entre APIs.
 
@@ -384,24 +374,9 @@ class MotoGPApiClient:
         candidates = [e for e in remaining_real if _not_over(e)] or remaining_real
         candidates = sorted(candidates, key=lambda e: e.get("date_start") or "9999-12-31")
 
-        # Le champ "status" peut rester à CURRENT plusieurs jours après la
-        # fin d'un Grand Prix : on écarte donc les événements dont la date
-        # de fin (date_end, format AAAA-MM-JJ) est déjà passée, puis on
-        # trie par date de début pour ne pas dépendre de l'ordre de la liste.
-        today = datetime.now(timezone.utc).date()
-
-        def _not_over(event: dict[str, Any]) -> bool:
-            end = _parse_event_date(event.get("date_end"))
-            return end is None or end >= today
-
-        candidates = [e for e in remaining_real if _not_over(e)] or remaining_real
-        candidates = sorted(candidates, key=lambda e: e.get("date_start") or "9999-12-31")
-
         # Priorité au Grand Prix en cours (première session déjà démarrée),
         # sinon le tout prochain à venir.
         next_event = next(
-            (e for e in candidates if e.get("status") == "CURRENT"),
-            candidates[0],
             (e for e in candidates if e.get("status") == "CURRENT"),
             candidates[0],
         )
